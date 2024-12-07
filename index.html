@@ -1,5 +1,5 @@
-<html><head><base href="." /><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>VelvaPlayer</title>
+<html><head><base href="."><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VelvaPlayer (v1.1)</title>
 <style>
 :root {
   --primary: #8b5cf6;
@@ -94,6 +94,24 @@ header p {
 
 .play-btn:hover {
   transform: scale(1.1);
+}
+
+.control-btn {
+  width: 45px;  /* Slightly smaller than play button */
+  height: 45px;
+  border-radius: 50%;
+  background: rgba(139, 92, 246, 0.2);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.control-btn:hover {
+  transform: scale(1.1);
+  background: rgba(139, 92, 246, 0.3);
 }
 
 .progress-bar {
@@ -307,17 +325,14 @@ header p {
 </style>
 </head>
 <body>
+<div style="position: fixed; top: 10px; left: 10px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">v1.1</div>
 <header style="text-align: center; margin-bottom: 30px;">
   <h1 style="font-size: 2.5em; margin-bottom: 5px;">VelvaPlayer</h1>
   <p style="color: rgba(255, 255, 255, 0.7); font-size: 1.1em; margin: 0;">A Free online music player for audio files</p>
 </header>
 <div class="container">
   <div class="player-container">
-    <div class="upload-area" id="uploadArea">
-      <h2>Drop your audio file here</h2>
-      <p>or click to browse</p>
-      <input type="file" id="fileInput" accept="audio/*" style="display: none;">
-    </div>
+    <div></div>
     
     <div class="album-art">
       <img id="albumCover" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%232d2d2d'/%3E%3Cpath d='M150 70a80 80 0 1 0 80 80 80 80 0 0 0-80-80zm0 120a40 40 0 1 1 40-40 40 40 0 0 1-40 40z' fill='%238b5cf6'/%3E%3C/svg%3E" alt="Default album art showing a vinyl record">
@@ -329,12 +344,22 @@ header p {
       <p class="artist-name" id="artistName">Artist Name</p>
     </div>
 
-    <audio id="audioPlayer" controls style="display: none;"></audio>
+    <audio id="audioPlayer" controls="" style="display: none;"></audio>
     
     <div class="controls">
+      <button class="control-btn" id="prevBtn">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+          <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"></path>
+        </svg>
+      </button>
       <button class="play-btn" id="playBtn">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-          <path d="M8 5v14l11-7z"/>
+          <path d="M8 5v14l11-7z"></path>
+        </svg>
+      </button>
+      <button class="control-btn" id="nextBtn">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+          <path d="M6 6l8.5 6-8.5 6V6zm9 12h2V6h-2z"></path>
         </svg>
       </button>
     </div>
@@ -345,7 +370,7 @@ header p {
     <div class="volume-control">
       <div class="volume-icon" id="volumeIcon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path>
         </svg>
       </div>
       <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="100">
@@ -373,8 +398,6 @@ header p {
 </div>
 
 <script>
-const uploadArea = document.getElementById('uploadArea');
-const fileInput = document.getElementById('fileInput');
 const audioPlayer = document.getElementById('audioPlayer');
 const playBtn = document.getElementById('playBtn');
 const progressBar = document.getElementById('progressBar');
@@ -390,6 +413,9 @@ const volumeIcon = document.getElementById('volumeIcon');
 const currentTimeDisplay = document.getElementById('currentTime');
 const totalTimeDisplay = document.getElementById('totalTime');
 
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+
 const playlist = document.getElementById('playlist');
 const playlistUpload = document.getElementById('playlistUpload');
 const playlistInput = document.getElementById('playlistInput');
@@ -398,39 +424,6 @@ let playlistItems = [];
 let currentTrackIndex = -1;
 
 // Click to upload
-uploadArea.addEventListener('click', () => {
-  fileInput.click();
-});
-
-fileInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (file) {
-    handleFile(file);
-    uploadArea.style.display = 'none';
-  }
-});
-
-// Handle drag and drop
-uploadArea.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  uploadArea.style.background = 'rgba(139, 92, 246, 0.2)';
-});
-
-uploadArea.addEventListener('dragleave', (e) => {
-  e.preventDefault();
-  uploadArea.style.background = 'transparent';
-});
-
-uploadArea.addEventListener('drop', (e) => {
-  e.preventDefault();
-  uploadArea.style.background = 'transparent';
-  const file = e.dataTransfer.files[0];
-  if (file) {
-    handleFile(file);
-    uploadArea.style.display = 'none';
-  }
-});
-
 playlistUpload.addEventListener('click', () => {
   playlistInput.click();
 });
@@ -440,68 +433,32 @@ playlistInput.addEventListener('change', (e) => {
   files.forEach(file => addToPlaylist(file));
 });
 
-// Playlist drag and drop
-playlistUpload.addEventListener('dragover', (e) => {
+// Add drag and drop event listeners for the entire document
+document.addEventListener('dragover', (e) => {
   e.preventDefault();
-  playlistUpload.style.background = 'rgba(139, 92, 246, 0.2)';
+  document.body.style.opacity = '0.7';
 });
 
-playlistUpload.addEventListener('dragleave', (e) => {
+document.addEventListener('dragleave', (e) => {
   e.preventDefault();
-  playlistUpload.style.background = 'transparent';
+  document.body.style.opacity = '1';
 });
 
-playlistUpload.addEventListener('drop', (e) => {
+document.addEventListener('drop', (e) => {
   e.preventDefault();
-  playlistUpload.style.background = 'transparent';
+  document.body.style.opacity = '1';
+  
   const files = Array.from(e.dataTransfer.files);
   files.forEach(file => addToPlaylist(file));
 });
 
-function handleFile(file) {
-  if (file.type.startsWith('audio/')) {
-    const url = URL.createObjectURL(file);
-    audioPlayer.src = url;
-    
-    // Load metadata
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      const mediaTagReader = new window.jsmediatags.Reader(file);
-      mediaTagReader.read({
-        onSuccess: function(tag) {
-          // Update song info
-          songTitle.textContent = tag.tags.title || file.name;
-          albumName.textContent = tag.tags.album || 'Unknown Album';
-          artistName.textContent = tag.tags.artist || 'Unknown Artist';
-          songYear.textContent = tag.tags.year ? `[${tag.tags.year}]` : '';
-          
-          // Handle album artwork
-          if (tag.tags.picture) {
-            const { data, format } = tag.tags.picture;
-            let base64String = '';
-            for (let i = 0; i < data.length; i++) {
-              base64String += String.fromCharCode(data[i]);
-            }
-            albumCover.src = `data:${format};base64,${window.btoa(base64String)}`;
-          }
-        },
-        onError: function(error) {
-          console.log('Error reading tags:', error.type, error.info);
-          songTitle.textContent = file.name;
-          albumName.textContent = 'Unknown Album';
-          artistName.textContent = 'Unknown Artist';
-          songYear.textContent = '';
-        }
-      });
-    };
-    reader.readAsArrayBuffer(file);
-  } else {
-    alert('Please upload an audio file');
-  }
-}
-
 function addToPlaylist(file) {
-  if (!file.type.startsWith('audio/')) {
+  const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.wma', '.flac'];
+  const hasAudioExtension = audioExtensions.some(ext => 
+    file.name.toLowerCase().endsWith(ext)
+  );
+    
+  if (!file.type.startsWith('audio/') && !hasAudioExtension) {
     alert('Please upload audio files only');
     return;
   }
@@ -717,6 +674,12 @@ function loadTrack(index) {
   // Reset time displays
   currentTimeDisplay.textContent = '0:00';
   totalTimeDisplay.textContent = '0:00';
+
+  // Update previous/next button states
+  prevBtn.disabled = index === 0;
+  nextBtn.disabled = index === playlistItems.length - 1;
+  prevBtn.style.opacity = index === 0 ? '0.5' : '1';
+  nextBtn.style.opacity = index === playlistItems.length - 1 ? '0.5' : '1';
 }
 
 // Handle play/pause
@@ -798,7 +761,23 @@ function formatTime(seconds) {
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
+
+// Add event listeners for the buttons
+prevBtn.addEventListener('click', playPreviousTrack);
+nextBtn.addEventListener('click', playNextTrack);
+
+function playPreviousTrack() {
+  if (currentTrackIndex > 0) {
+    loadTrack(currentTrackIndex - 1);
+  }
+}
+
+function playNextTrack() {
+  if (currentTrackIndex < playlistItems.length - 1) {
+    loadTrack(currentTrackIndex + 1);
+  }
+}
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
-</body>
-</html>
+
+</body></html>
