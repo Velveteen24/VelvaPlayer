@@ -1,5 +1,4 @@
-<html><head><base href="."><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VelvaPlayer (v1.1)</title>
+<title>VelvaPlayer</title>
 <style>
 :root {
   --primary: #8b5cf6;
@@ -114,6 +113,16 @@ header p {
   background: rgba(139, 92, 246, 0.3);
 }
 
+/* Repeat Button specific styling for state indication */
+#repeatBtn {
+    position: relative;
+    color: rgba(255, 255, 255, 0.7); /* Off state: dimmed white/light gray */
+}
+
+#repeatBtn.active {
+    color: var(--primary); /* Active loop state: primary color */
+}
+
 .progress-bar {
   width: 100%;
   height: 6px;
@@ -132,16 +141,35 @@ header p {
 
 .lyrics-container {
   margin-top: 20px;
-  max-height: 300px;
-  overflow-y: auto;
+  /* max-height: 300px; */ /* Removed fixed max-height */
+  overflow-y: hidden;
   padding: 20px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
+  position: relative;
+}
+
+#lyricsDisplay {
+  /* Container for scrollable content */
+  overflow-y: hidden; 
+}
+
+#lyricsContent {
+  /* This is where the actual scrolling content resides */
+  padding: 10px 0;
+  overflow-y: auto;
+  max-height: 300px; /* Default height */
+  transition: max-height 0.3s ease;
+}
+
+#lyricsContent p {
+  margin: 10px 0;
+  transition: color 0.3s, transform 0.3s;
+  text-align: center;
 }
 
 .current-line {
   color: var(--primary);
-  font-weight: bold;
 }
 
 .song-info {
@@ -322,10 +350,53 @@ header p {
   margin: 10px 0;
   font-family: monospace;
 }
+
+/* LRC Search Result Styling */
+.lrc-result-item {
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.lrc-result-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.lrc-result-main-info {
+    font-weight: bold;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lrc-result-secondary-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9em;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.synced-status {
+    font-weight: bold;
+}
+
+.status-synced {
+    color: #33cc33; /* Green */
+}
+
+.status-unsynced {
+    color: #ff4444; /* Red */
+}
 </style>
 </head>
 <body>
-<div style="position: fixed; top: 10px; left: 10px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">v1.1</div>
+<div style="position: fixed; top: 10px; left: 10px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">v2.0</div>
 <header style="text-align: center; margin-bottom: 30px;">
   <h1 style="font-size: 2.5em; margin-bottom: 5px;">VelvaPlayer</h1>
   <p style="color: rgba(255, 255, 255, 0.7); font-size: 1.1em; margin: 0;">A Free online music player for audio files</p>
@@ -347,6 +418,13 @@ header p {
     <audio id="audioPlayer" controls="" style="display: none;"></audio>
     
     <div class="controls">
+      <button class="control-btn" id="repeatBtn">
+        <svg id="repeatIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v3z"></path>
+        </svg>
+        <!-- Indicator for Repeat One mode -->
+        <span id="repeatOneIndicator" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; font-weight: bold; color: var(--background); line-height: 1;">1</span>
+      </button>
       <button class="control-btn" id="prevBtn">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
           <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"></path>
@@ -380,8 +458,63 @@ header p {
       <div class="progress" id="progress"></div>
     </div>
     
-    <div class="lyrics-container" id="lyrics">
-      <p>Lyrics not available - please consult official sources</p>
+    <div class="lyrics-container" id="lyricsContainer">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h3 style="margin: 0; font-size: 1.2em;">Lyrics</h3>
+        <button id="syncLyricsBtn" class="control-btn" style="width: auto; height: auto; padding: 8px 12px; border-radius: 6px; background: rgba(139, 92, 246, 0.2);">Sync / Edit Lyrics</button>
+      </div>
+
+      <!-- Sync/Edit Panel (Hidden by default) -->
+      <div id="lyricsEditPanel" style="display: none; padding-top: 15px; margin-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+        <p style="font-size: 0.9em; margin-top: 0; color: rgba(255, 255, 255, 0.7);">Paste LRC content, plain lyrics, or upload an LRC file.</p>
+        <textarea id="lrcInputArea" placeholder="Paste synchronized LRC content here (e.g., [00:10.50]Line one)" style="width: 100%; min-height: 150px; background: rgba(0,0,0,0.2); border: 1px solid var(--primary); color: var(--text); padding: 10px; border-radius: 6px; box-sizing: border-box; resize: vertical; font-family: monospace;"></textarea>
+        
+        <!-- NEW SYNC CONTROLS -->
+        <div id="syncControls" style="display: flex; justify-content: space-between; gap: 10px; margin-top: 10px; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 6px;">
+            <button id="rewind5sBtn" class="control-btn" style="width: auto; height: auto; padding: 10px 15px; border-radius: 8px; background: #cc3333;">Rewind 5s</button>
+            <button id="syncLineActionBtn" class="control-btn" style="flex-grow: 1; height: auto; padding: 10px 15px; border-radius: 8px; background: #33cc33; color: white; font-weight: bold;">Sync Current Line (T)</button>
+        </div>
+        <!-- END NEW SYNC CONTROLS -->
+
+        <!-- NEW SHIFT CONTROLS -->
+        <div id="shiftControls" style="display: flex; justify-content: center; gap: 10px; margin-top: 10px; padding: 10px 0;">
+            <button id="shiftBackwardBtn" class="control-btn" style="width: auto; height: auto; padding: 8px 15px; border-radius: 8px; background: rgba(255, 255, 255, 0.1);">Shift Back 0.1s</button>
+            <button id="shiftForwardBtn" class="control-btn" style="width: auto; height: auto; padding: 8px 15px; border-radius: 8px; background: rgba(255, 255, 255, 0.1);">Shift Forward 0.1s</button>
+        </div>
+        <!-- END NEW SHIFT CONTROLS -->
+
+        <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center;">
+          <button id="saveLyricsBtn" class="control-btn" style="width: auto; height: auto; padding: 10px 15px; border-radius: 8px; background: var(--primary);">Save Lyrics</button>
+          
+          <button id="uploadLrcBtn" class="control-btn" style="width: auto; height: auto; padding: 10px 15px; border-radius: 8px;">Upload .LRC File</button>
+          <input type="file" id="lrcFileInput" accept=".lrc" style="display: none;">
+
+          <button id="fetchLrcBtn" class="control-btn" style="width: auto; height: auto; padding: 10px 15px; border-radius: 8px;">Fetch from LRC Lib</button>
+        </div>
+        
+        <!-- NEW LRC SEARCH PANEL -->
+        <div id="lyricsSearchPanel" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+            <h4 style="margin-top: 0; margin-bottom: 10px; color: var(--primary);">LRC Lib Search</h4>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input type="text" id="lrcSearchTitle" placeholder="Song Title" style="flex: 1; padding: 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.2); color: var(--text); border-radius: 4px;">
+                <input type="text" id="lrcSearchArtist" placeholder="Artist" style="flex: 1; padding: 8px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.2); color: var(--text); border-radius: 4px;">
+            </div>
+            <button id="runLrcSearchBtn" class="control-btn" style="width: 100%; height: auto; padding: 10px 15px; border-radius: 8px; background: #60a5fa;">Search LRC Lib</button>
+            <div id="lrcSearchResults" style="margin-top: 10px; max-height: 200px; overflow-y: auto;">
+                <!-- Results go here -->
+                <p id="lrcSearchPlaceholder" style="text-align: center; color: rgba(255, 255, 255, 0.5);">Enter search terms and click search.</p>
+            </div>
+        </div>
+        <!-- END NEW LRC SEARCH PANEL -->
+
+      </div>
+      
+      <!-- Main Lyrics Display -->
+      <div id="lyricsDisplay">
+        <div id="lyricsContent">
+          <p id="currentLyrics" style="text-align: center;">Lyrics not available - please load a track or use the sync panel.</p>
+        </div>
+      </div>
     </div>
   </div>
   
@@ -403,7 +536,6 @@ const playBtn = document.getElementById('playBtn');
 const progressBar = document.getElementById('progressBar');
 const progress = document.getElementById('progress');
 const albumCover = document.getElementById('albumCover');
-const lyricsContainer = document.getElementById('lyrics');
 const songTitle = document.getElementById('songTitle');
 const albumName = document.getElementById('albumName');
 const songYear = document.getElementById('songYear');
@@ -415,13 +547,48 @@ const totalTimeDisplay = document.getElementById('totalTime');
 
 const prevBtn = document.getElementById('prevBtn');
 const nextBtn = document.getElementById('nextBtn');
+const repeatBtn = document.getElementById('repeatBtn');
+const repeatOneIndicator = document.getElementById('repeatOneIndicator');
 
 const playlist = document.getElementById('playlist');
 const playlistUpload = document.getElementById('playlistUpload');
 const playlistInput = document.getElementById('playlistInput');
 
+// New Lyric Management Elements
+const lyricsContainer = document.getElementById('lyricsContainer'); 
+const lyricsDisplay = document.getElementById('lyricsDisplay');
+const lyricsContent = document.getElementById('lyricsContent');
+const currentLyricsP = document.getElementById('currentLyrics');
+const syncLyricsBtn = document.getElementById('syncLyricsBtn');
+const lyricsEditPanel = document.getElementById('lyricsEditPanel');
+const lrcInputArea = document.getElementById('lrcInputArea');
+const saveLyricsBtn = document.getElementById('saveLyricsBtn');
+const uploadLrcBtn = document.getElementById('uploadLrcBtn');
+const lrcFileInput = document.getElementById('lrcFileInput');
+const fetchLrcBtn = document.getElementById('fetchLrcBtn');
+
+// New sync controls
+const rewind5sBtn = document.getElementById('rewind5sBtn');
+const syncLineActionBtn = document.getElementById('syncLineActionBtn');
+
+// New shift controls
+const shiftBackwardBtn = document.getElementById('shiftBackwardBtn');
+const shiftForwardBtn = document.getElementById('shiftForwardBtn');
+
+// New search elements
+const lyricsSearchPanel = document.getElementById('lyricsSearchPanel');
+const lrcSearchTitle = document.getElementById('lrcSearchTitle');
+const lrcSearchArtist = document.getElementById('lrcSearchArtist');
+const runLrcSearchBtn = document.getElementById('runLrcSearchBtn');
+const lrcSearchResults = document.getElementById('lrcSearchResults');
+const lrcSearchPlaceholder = document.getElementById('lrcSearchPlaceholder');
+
+
 let playlistItems = [];
 let currentTrackIndex = -1;
+let currentLRC = []; // To store parsed LRC data [{time: seconds, text: string}, ...]
+let lyricsPanelOpen = false; // New state variable
+let repeatMode = 'off'; // 'off', 'playlist', 'one'
 
 // Click to upload
 playlistUpload.addEventListener('click', () => {
@@ -472,7 +639,8 @@ function addToPlaylist(file) {
         artist: tag.tags.artist || 'Unknown Artist',
         album: tag.tags.album || 'Unknown Album',
         year: tag.tags.year || '',
-        picture: tag.tags.picture
+        picture: tag.tags.picture,
+        lrcText: undefined // Initialize LRC storage for the item (undefined means never attempted fetch/set)
       };
 
       playlistItems.push(item);
@@ -490,7 +658,8 @@ function addToPlaylist(file) {
         artist: 'Unknown Artist',
         album: 'Unknown Album',
         year: '',
-        picture: null
+        picture: null,
+        lrcText: undefined // Initialize LRC storage for the item
       };
       
       playlistItems.push(item);
@@ -502,6 +671,84 @@ function addToPlaylist(file) {
     }
   });
 }
+
+function parseLRC(lrcText) {
+    if (!lrcText) return [];
+    
+    // Regex to capture timestamp [m:ss.xx] or [m:ss] and the remaining text
+    const lines = lrcText.split('\n');
+    const parsed = [];
+    
+    // Supports [mm:ss.xx] or [m:ss.xx] format
+    const timestampRegex = /\[(\d{1,2}):(\d{2}(?:\.\d{1,3})?)\]/g; 
+
+    lines.forEach(line => {
+        const matches = [...line.matchAll(timestampRegex)];
+        let lyricText = line.replace(timestampRegex, '').trim();
+
+        if (lyricText || matches.length > 0) {
+            matches.forEach(match => {
+                const timeString = match[1] + ':' + match[2];
+                
+                let minutes = 0;
+                let seconds = 0;
+                
+                // We use Number conversion which handles M:S.ms correctly
+                const parts = timeString.split(':');
+                minutes = parseFloat(parts[0]);
+                seconds = parseFloat(parts[1]);
+
+                const time = minutes * 60 + seconds;
+                
+                parsed.push({ time, text: lyricText });
+            });
+            
+            // Handle lines with no timestamp (metadata or plain text)
+            if (matches.length === 0 && lyricText) {
+                 parsed.push({ time: -1, text: lyricText });
+            }
+        }
+    });
+
+    // Sort by time, filtering out lines without timestamp (except for text-only lines which we check for later)
+    const syncedLines = parsed.filter(item => item.time !== -1);
+    syncedLines.sort((a, b) => a.time - b.time);
+    
+    // If no synced lines were found, return all lines that have text (treated as plain text)
+    if (syncedLines.length === 0) {
+        return parsed.filter(item => item.text && item.time === -1); 
+    }
+    
+    return syncedLines;
+}
+
+/**
+ * Utility function to format time in LRC style [MM:SS.xx]
+ * @param {number} timeInSeconds 
+ * @returns {string} Formatted LRC timestamp [MM:SS.xx]
+ */
+function formatLrcTime(timeInSeconds) {
+    const totalSeconds = timeInSeconds;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    
+    // Format to [MM:SS.xx] where xx are hundredths of a second
+    // Use toFixed(2) to get two decimal places for milliseconds
+    const secsPart = seconds.toFixed(2).padStart(5, '0');
+    const timeString = `${minutes.toString().padStart(2, '0')}:${secsPart}`;
+    return `[${timeString}]`;
+}
+
+function seekToLyricTime(time) {
+    if (currentTrackIndex === -1) return;
+    audioPlayer.currentTime = time;
+    // Ensure playback starts if it was paused and the user seeks
+    if (audioPlayer.paused) {
+        audioPlayer.play();
+        playBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+    }
+}
+
 
 function renderPlaylistItem(item, index) {
   const li = document.createElement('li');
@@ -619,6 +866,11 @@ function deleteTrack(index) {
     songYear.textContent = '[Year]';
     albumCover.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Crect width=\'300\' height=\'300\' fill=\'%232d2d2d\'/%3E%3Cpath d=\'M150 70a80 80 0 1 0 80 80 80 80 0 0 0-80-80zm0 120a40 40 0 1 1 40-40 40 40 0 0 1-40 40z\' fill=\'%238b5cf6\'/%3E%3C/svg%3E';
     currentTrackIndex = -1;
+    
+    // Clear lyrics
+    currentLRC = [];
+    renderLyrics('Lyrics not available - please load a track or use the sync panel.');
+    
   } else if (index < currentTrackIndex) {
     currentTrackIndex--;
   }
@@ -680,6 +932,260 @@ function loadTrack(index) {
   nextBtn.disabled = index === playlistItems.length - 1;
   prevBtn.style.opacity = index === 0 ? '0.5' : '1';
   nextBtn.style.opacity = index === playlistItems.length - 1 ? '0.5' : '1';
+  
+  // Try loading stored lyrics or fetching from lrclib
+  loadLyrics(item);
+}
+
+/**
+ * Renders the lyrics display, either synced or plain text.
+ * @param {string} lyricsData - LRC text or plain text.
+ */
+function renderLyrics(lyricsData) {
+    let lyricsText;
+    
+    if (typeof lyricsData === 'string') {
+        lyricsText = lyricsData;
+    } else if (currentTrackIndex !== -1 && playlistItems[currentTrackIndex] && playlistItems[currentTrackIndex].lrcText !== undefined) {
+        lyricsText = playlistItems[currentTrackIndex].lrcText;
+    } else {
+        lyricsText = 'Lyrics not available - please load a track or use the sync panel.';
+    }
+    
+    currentLRC = parseLRC(lyricsText);
+    lyricsContent.innerHTML = ''; // Clear previous content
+
+    if (currentLRC.length > 0 && currentLRC[0].time !== -1) {
+        // We have synced lyrics 
+        currentLRC.forEach((line, index) => {
+            const p = document.createElement('p');
+            p.dataset.time = line.time;
+            p.dataset.index = index;
+            p.textContent = line.text;
+            p.addEventListener('click', () => {
+                seekToLyricTime(parseFloat(line.time));
+            });
+            lyricsContent.appendChild(p);
+        });
+        lyricsContent.style.textAlign = 'left';
+    } else {
+        // Plain text or nothing
+        const lines = lyricsText.split('\n').map(line => line.trim()).filter(line => line);
+        
+        if (lines.length > 0) {
+             lyricsContent.innerHTML = lines.map(line => `<p>${line}</p>`).join('');
+        } else {
+             // Use the original placeholder message structure if nothing is present
+             lyricsContent.innerHTML = `<p id="currentLyrics">Lyrics not available - please load a track or use the sync panel.</p>`;
+        }
+        lyricsContent.style.textAlign = 'center';
+    }
+    
+    // Reset scroll and highlight
+    lyricsContent.scrollTop = 0;
+}
+
+/**
+ * Renders a list of search results fetched from LRC Lib.
+ * @param {Array} results - Array of LRC Lib search results.
+ */
+function renderLrcSearchResults(results) {
+    lrcSearchResults.innerHTML = '';
+    
+    if (results.length === 0) {
+        lrcSearchResults.innerHTML = '<p style="text-align: center; color: rgba(255, 255, 255, 0.5);">No results found.</p>';
+        return;
+    }
+    
+    results.forEach(result => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'lrc-result-item';
+        itemDiv.dataset.trackId = result.trackId;
+        
+        // Ensure result has at least one type of lyric before showing selection option
+        if (!result.syncedLyrics && !result.plainLyrics) return;
+
+        const statusText = result.syncedLyrics 
+            ? '<span class="status-synced">Lyrics Synced ✔</span>' 
+            : '<span class="status-unsynced">Lyrics Not Synced ✘</span>';
+        
+        const durationDisplay = result.duration ? formatTime(result.duration) : 'N/A';
+        
+        itemDiv.innerHTML = `
+            <div class="lrc-result-main-info">${result.trackName} - ${result.artistName}</div>
+            <div class="lrc-result-secondary-info">
+                <span>Length: ${durationDisplay}</span>
+                <span class="synced-status">${statusText}</span>
+            </div>
+        `;
+
+        itemDiv.addEventListener('click', async () => {
+            await loadSelectedLRC(result);
+        });
+
+        lrcSearchResults.appendChild(itemDiv);
+    });
+}
+
+/**
+ * Loads the selected lyrics result (either synced or plain) and updates the player state.
+ * @param {object} result - The selected search result object.
+ */
+async function loadSelectedLRC(result) {
+    if (currentTrackIndex === -1) {
+        alert('No song loaded in the player.');
+        return;
+    }
+
+    const lyricsToUse = result.syncedLyrics || result.plainLyrics;
+    
+    if (lyricsToUse) {
+        playlistItems[currentTrackIndex].lrcText = lyricsToUse;
+        lrcInputArea.value = lyricsToUse; // Update editor
+        renderLyrics(lyricsToUse); // Update display
+        alert(`Lyrics for "${result.trackName}" by ${result.artistName} loaded successfully.`);
+        
+        // Close the search panel
+        lyricsSearchPanel.style.display = 'none';
+        
+    } else {
+        alert('Selected result contains no lyrics.');
+    }
+}
+
+
+/**
+ * Performs a search against LRC Lib based on input fields.
+ */
+async function performLrcSearch() {
+    const title = lrcSearchTitle.value.trim();
+    const artist = lrcSearchArtist.value.trim();
+    
+    if (!title && !artist) {
+        alert('Please enter a song title or artist name.');
+        return;
+    }
+    
+    runLrcSearchBtn.textContent = 'Searching...';
+    runLrcSearchBtn.disabled = true;
+    lrcSearchResults.innerHTML = '';
+    lrcSearchResults.innerHTML = '<p style="text-align: center; color: rgba(255, 255, 255, 0.5);">Searching...</p>';
+
+    const duration = audioPlayer.duration > 0 && !isNaN(audioPlayer.duration) ? Math.round(audioPlayer.duration) : 0;
+    
+    // Construct search URL
+    let searchUrl = `https://lrclib.net/api/search?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(artist)}&limit=15`;
+    if (duration > 0) {
+        searchUrl += `&duration=${duration}`;
+    }
+
+    try {
+        const response = await fetch(searchUrl);
+        
+        if (!response.ok) {
+            throw new Error(`LRC Lib search failed: ${response.statusText}`);
+        }
+        
+        const results = await response.json();
+        renderLrcSearchResults(results);
+        
+    } catch(e) {
+        console.error("Error performing LRC Lib search:", e);
+        lrcSearchResults.innerHTML = '<p style="text-align: center; color: #ff4444;">Failed to fetch search results. Check console for details.</p>';
+    } finally {
+        runLrcSearchBtn.textContent = 'Search LRC Lib';
+        runLrcSearchBtn.disabled = false;
+    }
+}
+
+
+/**
+ * Attempts to automatically find and load the best lyric match upon track loading.
+ */
+async function autoFetchLRCIfMissing(item) {
+    if (!item.title || !item.artist || item.title === 'Song Title') {
+        return false;
+    }
+    
+    // Check duration readiness
+    if (audioPlayer.duration === 0 || isNaN(audioPlayer.duration)) {
+        return false;
+    }
+    
+    const durationMs = Math.round(audioPlayer.duration); 
+    // We search the database for a close match to the song metadata. Limit 1 for automatic process.
+    const searchUrl = `https://lrclib.net/api/search?track_name=${encodeURIComponent(item.title)}&artist_name=${encodeURIComponent(item.artist)}&duration=${durationMs}&limit=1`;
+
+    try {
+        console.log("Attempting automatic LRC fetch...");
+        const response = await fetch(searchUrl);
+        
+        if (!response.ok) {
+            throw new Error(`LRC Lib search failed: ${response.statusText}`);
+        }
+        
+        const results = await response.json();
+        
+        if (results && results.length > 0) {
+            const bestMatch = results[0];
+            let lrcContent = bestMatch.syncedLyrics || bestMatch.plainLyrics;
+
+            if (lrcContent) {
+                // Store and render lyrics
+                playlistItems[currentTrackIndex].lrcText = lrcContent;
+                if (lyricsPanelOpen) {
+                     lrcInputArea.value = lrcContent;
+                }
+                renderLyrics(lrcContent);
+                console.log('Automatically loaded lyrics from LRC Lib.');
+                return true;
+            }
+        }
+        
+        // If nothing was found, mark as attempted (empty string)
+        playlistItems[currentTrackIndex].lrcText = '';
+        renderLyrics('Lyrics not found automatically. Use Sync/Edit panel to search manually.');
+        return false;
+        
+    } catch(e) {
+        console.error("Error during automatic LRC Lib fetch:", e);
+        playlistItems[currentTrackIndex].lrcText = '';
+        renderLyrics('Automatic lyric search failed.');
+        return false;
+    } 
+}
+
+
+function loadLyrics(item) {
+    // If lrcText is present (even if empty string, meaning it was tried before), render it.
+    if (item.lrcText !== undefined) {
+        renderLyrics(item.lrcText);
+    } else {
+        // If undefined, try automatic fetching.
+        renderLyrics('Lyrics loading/not available.');
+        
+        const attemptFetch = () => {
+             // Only attempt if duration is known and we haven't tried yet
+             if (currentTrackIndex !== -1 && playlistItems[currentTrackIndex].lrcText === undefined && audioPlayer.duration > 0 && !isNaN(audioPlayer.duration)) {
+                autoFetchLRCIfMissing(playlistItems[currentTrackIndex]);
+            }
+        }
+        
+        // Listeners for when duration/metadata becomes available
+        // Use capture/once to ensure cleanup
+        audioPlayer.addEventListener('loadedmetadata', attemptFetch, { once: true });
+        audioPlayer.addEventListener('durationchange', attemptFetch, { once: true });
+        
+        // If duration is already known, attempt immediately
+        if (audioPlayer.duration > 0 && !isNaN(audioPlayer.duration)) {
+             attemptFetch();
+        }
+    }
+    
+    // Update input area if panel is open
+    if (lyricsPanelOpen) {
+        lrcInputArea.value = item.lrcText || '';
+    }
 }
 
 // Handle play/pause
@@ -698,7 +1204,57 @@ audioPlayer.addEventListener('timeupdate', () => {
   const percentage = (audioPlayer.currentTime / audioPlayer.duration) * 100;
   progress.style.width = percentage + '%';
   currentTimeDisplay.textContent = formatTime(audioPlayer.currentTime);
+  
+  if (currentLRC.length > 0) {
+    updateSyncedLyrics(audioPlayer.currentTime);
+  }
 });
+
+/**
+ * Updates the highlighted line for synced lyrics.
+ * This function also handles scrolling.
+ */
+function updateSyncedLyrics(time) {
+    const lines = Array.from(lyricsContent.querySelectorAll('p[data-time]'));
+    if (lines.length === 0) return;
+
+    let activeLineIndex = -1;
+
+    // Find the current line based on timestamp
+    for (let i = lines.length - 1; i >= 0; i--) {
+        const lineTime = parseFloat(lines[i].dataset.time);
+        
+        // Find the line whose timestamp is <= current time, allowing a small tolerance (100ms early activation)
+        if (lineTime <= time + 0.1) { 
+            activeLineIndex = i;
+            break;
+        }
+    }
+
+    lines.forEach((line, index) => {
+        const isActive = index === activeLineIndex;
+        line.classList.toggle('current-line', isActive);
+        
+        if (isActive) {
+            // Scroll to center the active line
+            const containerHeight = lyricsContent.clientHeight;
+            const lineOffset = line.offsetTop;
+            const lineHeight = line.offsetHeight;
+            
+            // Calculate scroll position to center the line
+            // We use the offset relative to its container (lyricsContent)
+            lyricsContent.scrollTop = lineOffset - (containerHeight / 2) + (lineHeight / 2);
+        } else {
+             // Ensure non-active lines don't get stuck in highlight
+             line.classList.remove('current-line');
+        }
+    });
+
+    if (activeLineIndex === -1 && time > audioPlayer.duration) {
+      // Clear highlight if song finished but not looped
+      lines.forEach(line => line.classList.remove('current-line'));
+    }
+}
 
 // Add duration change event listener
 audioPlayer.addEventListener('durationchange', () => {
@@ -724,11 +1280,11 @@ volumeSlider.addEventListener('input', (e) => {
 // Update volume icon based on volume level
 function updateVolumeIcon(volume) {
   if (volume === 0) {
-    volumeIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>';
+    volumeIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>';
   } else if (volume < 0.5) {
-    volumeIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>';
+    volumeIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"></path></svg>';
   } else {
-    volumeIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
+    volumeIcon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>';
   }
 }
 
@@ -748,8 +1304,18 @@ volumeIcon.addEventListener('click', () => {
 
 // Update the audioPlayer 'ended' event listener
 audioPlayer.addEventListener('ended', () => {
+  if (repeatMode === 'one') {
+    // Loop current song
+    audioPlayer.currentTime = 0;
+    audioPlayer.play();
+    return;
+  }
+    
   if (currentTrackIndex < playlistItems.length - 1) {
     loadTrack(currentTrackIndex + 1);
+  } else if (repeatMode === 'playlist' && playlistItems.length > 0) {
+    // If playlist loop is active, start from the beginning
+    loadTrack(0);
   } else {
     playBtn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
   }
@@ -761,6 +1327,242 @@ function formatTime(seconds) {
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
+
+// --- Syncing Functions ---
+
+/**
+ * Syncs the current audio time to the lyric line containing the cursor/selection in the lrcInputArea.
+ * It replaces any existing timestamp on that line and moves the cursor to the next line.
+ */
+function syncCurrentLine() {
+    if (currentTrackIndex === -1 || audioPlayer.paused) {
+        alert('Please load and play a song to sync lyrics.');
+        return;
+    }
+
+    const currentTime = audioPlayer.currentTime;
+    const timestamp = formatLrcTime(currentTime);
+    
+    const textarea = lrcInputArea;
+    const lines = textarea.value.split('\n');
+    
+    // Find the line index containing the cursor/selection start
+    const cursorPosition = textarea.selectionStart;
+    
+    let lineStart = 0;
+    let lineIndex = -1;
+
+    // Calculate which line index the cursor is in and the start position of that line
+    for (let i = 0; i < lines.length; i++) {
+        let lineLength = lines[i].length + 1; // +1 for newline
+        if (cursorPosition < lineStart + lineLength) {
+            lineIndex = i;
+            break;
+        }
+        lineStart += lineLength;
+    }
+    
+    // Handle case where cursor is exactly at the end (e.g., after the last newline)
+    if (lineIndex === -1 && lines.length > 0 && cursorPosition >= textarea.value.length) {
+        lineIndex = lines.length - 1;
+        lineStart = textarea.value.lastIndexOf('\n') + 1;
+    }
+
+    if (lineIndex === -1) {
+        alert('Cannot determine current lyric line.');
+        return;
+    }
+
+
+    // 1. Get the current line content
+    let currentLine = lines[lineIndex];
+    
+    // 2. Remove existing timestamp(s) if present
+    // Matches one or more timestamps [MM:SS.xx] at the start of the line, followed by optional spaces
+    const timestampRemovalRegex = /^(\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]\s*)+/;
+    const textOnly = currentLine.replace(timestampRemovalRegex, '').trim();
+
+    // 3. Create the new synced line
+    // Ensure we don't end up with trailing space if textOnly is empty
+    const newLine = `${timestamp}${textOnly ? ' ' + textOnly : ''}`;
+    lines[lineIndex] = newLine;
+    
+    // 4. Update the textarea
+    const newText = lines.join('\n');
+    textarea.value = newText;
+    
+    // 5. Calculate position for the start of the next line
+    let nextCursorPosition = 0;
+    
+    const nextLineIndex = lineIndex + 1;
+    
+    // Calculate total length of all lines up to the next line index
+    for (let i = 0; i < nextLineIndex; i++) {
+        if (lines[i] !== undefined) {
+             nextCursorPosition += lines[i].length + 1; // +1 for newline
+        }
+    }
+    
+    // If we moved past the last line, ensure the cursor lands at the very end.
+    if (nextLineIndex >= lines.length) {
+        nextCursorPosition = newText.length;
+        
+        // If the line we just modified was not empty, append a new line for easy continuation.
+        if (currentLine.trim() !== '' && !textarea.value.endsWith('\n')) {
+            textarea.value += '\n';
+            nextCursorPosition++;
+        }
+    }
+    
+    // Set selection
+    textarea.selectionStart = nextCursorPosition;
+    textarea.selectionEnd = nextCursorPosition;
+    textarea.focus();
+    
+    // Also, save this change to the current playlist item's lrcText immediately 
+    // so the display reflects the sync in real-time.
+    playlistItems[currentTrackIndex].lrcText = newText;
+    renderLyrics(newText);
+}
+
+function rewind5Seconds() {
+    if (currentTrackIndex === -1) return;
+    audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - 5);
+}
+
+/**
+ * Shifts all timestamps in the LRC input area by a specified offset.
+ * @param {number} offsetSeconds - The time shift in seconds (e.g., 0.1 or -0.1).
+ */
+function shiftLyricsTimestamps(offsetSeconds) {
+    if (currentTrackIndex === -1) {
+        alert('Please load a song first.');
+        return;
+    }
+
+    const textarea = lrcInputArea;
+    let lrcText = textarea.value;
+    
+    // Regex to capture timestamp [m:ss.xx] or [m:ss]
+    const timestampRegex = /\[(\d{1,2}):(\d{2}(?:\.\d{1,3})?)\]/g; 
+    
+    const lines = lrcText.split('\n');
+    const processedLines = lines.map(line => {
+
+        const updatedLine = line.replace(timestampRegex, (fullMatch, minutesStr, secondsStr) => {
+            
+            const minutes = parseFloat(minutesStr);
+            const seconds = parseFloat(secondsStr);
+            // Handle parsing to total seconds using parseFloat for robustness
+            let totalTime = minutes * 60 + seconds;
+            
+            // Apply shift
+            // Use toFixed(3) to minimize floating point errors before updating the time
+            let newTime = Math.max(0, parseFloat((totalTime + offsetSeconds).toFixed(3)));
+            
+            // Reformat the new time
+            const newTimestamp = formatLrcTime(newTime);
+            
+            return newTimestamp;
+        });
+
+        return updatedLine;
+    });
+
+    const newLrcText = processedLines.join('\n');
+    
+    // Update state and UI
+    textarea.value = newLrcText;
+    playlistItems[currentTrackIndex].lrcText = newLrcText;
+    renderLyrics(newLrcText);
+}
+
+
+// --- Lyrics Management Event Listeners ---
+
+function openLrcSearchPanel() {
+    if (currentTrackIndex === -1) {
+        alert('Please load a song first.');
+        return;
+    }
+    // Toggle visibility
+    const isVisible = lyricsSearchPanel.style.display !== 'none';
+    lyricsSearchPanel.style.display = isVisible ? 'none' : 'block';
+
+    if (!isVisible) {
+        // Pre-fill search fields with current track info
+        const item = playlistItems[currentTrackIndex];
+        lrcSearchTitle.value = item.title === 'Song Title' ? '' : item.title;
+        lrcSearchArtist.value = item.artist === 'Unknown Artist' ? '' : item.artist;
+        
+        // Clear previous results view
+        lrcSearchResults.innerHTML = '<p id="lrcSearchPlaceholder" style="text-align: center; color: rgba(255, 255, 255, 0.5);">Enter search terms and click search.</p>';
+    }
+}
+
+syncLyricsBtn.addEventListener('click', () => {
+    lyricsPanelOpen = !lyricsPanelOpen;
+    lyricsEditPanel.style.display = lyricsPanelOpen ? 'block' : 'none';
+    
+    // Adjust lyrics content max height when panel is open/closed
+    lyricsContent.style.maxHeight = lyricsPanelOpen ? '100px' : '300px'; 
+    
+    // If opening, populate the textarea with current lyrics data
+    if (lyricsPanelOpen && currentTrackIndex !== -1) {
+        // Ensure we load the current saved state, even if it's an empty string.
+        lrcInputArea.value = playlistItems[currentTrackIndex].lrcText || '';
+        
+        // Hide search panel when opening/closing main panel
+        lyricsSearchPanel.style.display = 'none';
+    }
+    
+    syncLyricsBtn.textContent = lyricsPanelOpen ? 'Hide Sync Panel' : 'Sync / Edit Lyrics';
+});
+
+saveLyricsBtn.addEventListener('click', () => {
+    if (currentTrackIndex === -1) {
+        alert('Please load a song first.');
+        return;
+    }
+    
+    const lrcText = lrcInputArea.value.trim();
+    playlistItems[currentTrackIndex].lrcText = lrcText;
+    renderLyrics(lrcText);
+    alert('Lyrics saved!');
+});
+
+uploadLrcBtn.addEventListener('click', () => {
+    lrcFileInput.click();
+});
+
+lrcFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const lrcText = event.target.result;
+            lrcInputArea.value = lrcText;
+            
+            if (currentTrackIndex !== -1) {
+                // Automatically save and render the uploaded LRC content
+                playlistItems[currentTrackIndex].lrcText = lrcText;
+                renderLyrics(lrcText);
+                alert('LRC file uploaded and lyrics loaded.');
+            } else {
+                alert('LRC file uploaded to editor. Load a song to save.');
+            }
+        };
+        reader.readAsText(file);
+    }
+    // Clear input so change event fires again if the same file is selected
+    e.target.value = '';
+});
+
+// Modify existing fetchLrcBtn to open the search panel
+fetchLrcBtn.addEventListener('click', openLrcSearchPanel);
+
+// Attach listener for the specific search button
+runLrcSearchBtn.addEventListener('click', performLrcSearch);
 
 // Add event listeners for the buttons
 prevBtn.addEventListener('click', playPreviousTrack);
@@ -777,6 +1579,31 @@ function playNextTrack() {
     loadTrack(currentTrackIndex + 1);
   }
 }
+
+// --- Repeat/Loop Logic ---
+
+function updateRepeatButton() {
+    repeatBtn.classList.remove('active');
+    repeatOneIndicator.style.display = 'none';
+
+    if (repeatMode === 'playlist') {
+        repeatBtn.classList.add('active');
+    } else if (repeatMode === 'one') {
+        repeatBtn.classList.add('active');
+        repeatOneIndicator.style.display = 'block';
+    }
+}
+
+repeatBtn.addEventListener('click', () => {
+    if (repeatMode === 'off') {
+        repeatMode = 'playlist'; // 1st click: Loop Playlist
+    } else if (repeatMode === 'playlist') {
+        repeatMode = 'one'; // 2nd click: Loop Song
+    } else { // 'one'
+        repeatMode = 'off'; // 3rd click: Turn off
+    }
+    updateRepeatButton();
+});
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
 
