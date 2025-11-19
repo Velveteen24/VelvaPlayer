@@ -396,7 +396,7 @@ header p {
 </style>
 </head>
 <body>
-<div style="position: fixed; top: 10px; left: 10px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">v2.0</div>
+<div style="position: fixed; top: 10px; left: 10px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">v2.01</div>
 <header style="text-align: center; margin-bottom: 30px;">
   <h1 style="font-size: 2.5em; margin-bottom: 5px;">VelvaPlayer</h1>
   <p style="color: rgba(255, 255, 255, 0.7); font-size: 1.1em; margin: 0;">A Free online music player for audio files</p>
@@ -864,7 +864,7 @@ function deleteTrack(index) {
     albumName.textContent = 'Album Name';
     artistName.textContent = 'Artist Name';
     songYear.textContent = '[Year]';
-    albumCover.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Crect width=\'300\' height=\'300\' fill=\'%232d2d2d\'/%3E%3Cpath d=\'M150 70a80 80 0 1 0 80 80 80 80 0 0 0-80-80zm0 120a40 40 0 1 1 40-40 40 40 0 0 1-40 40z\' fill=\'%238b5cf6\'/%3E%3C/svg%3E';
+    albumCover.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\' viewBox=\'0 0 300 300\'%3E%3Crect width=\'300\' height=\'300\' fill=\'%232d2d2d\'/%3E%3Cpath d=\'M150 70a80 80 0 1 0 80 80 80 80 0 0 0-80-80zm0 120a40 40 0 1 1 40-40 40 0 0 1-40 40z\' fill=\'%238b5cf6\'/%3E%3C/svg%3E';
     currentTrackIndex = -1;
     
     // Clear lyrics
@@ -1563,6 +1563,40 @@ fetchLrcBtn.addEventListener('click', openLrcSearchPanel);
 
 // Attach listener for the specific search button
 runLrcSearchBtn.addEventListener('click', performLrcSearch);
+
+// Add event listeners for the new sync controls
+syncLineActionBtn.addEventListener('click', syncCurrentLine);
+rewind5sBtn.addEventListener('click', rewind5Seconds);
+
+// Add event listeners for shift controls
+shiftForwardBtn.addEventListener('click', () => shiftLyricsTimestamps(0.1));
+shiftBackwardBtn.addEventListener('click', () => shiftLyricsTimestamps(-0.1));
+
+// Add global key listener for syncing (T key) and Rewind (R key)
+document.addEventListener('keydown', (e) => {
+    // Check if the target is an element where typing is expected
+    const targetTagName = e.target.tagName;
+    const isInput = targetTagName === 'INPUT' || targetTagName === 'TEXTAREA';
+
+    if (lyricsPanelOpen) {
+        // T for Sync Current Line (only if playing)
+        if ((e.key === 't' || e.key === 'T') && !audioPlayer.paused) {
+            // Prevent default typing behavior in the textarea if it is focused, 
+            // or prevent browser default if nothing is focused.
+            if (isInput || e.target === document.body) {
+                e.preventDefault(); 
+                syncCurrentLine();
+            }
+        }
+    
+        // R for Rewind 5 seconds 
+        if (e.key === 'r' || e.key === 'R') {
+            e.preventDefault();
+            rewind5Seconds();
+        }
+    }
+});
+
 
 // Add event listeners for the buttons
 prevBtn.addEventListener('click', playPreviousTrack);
